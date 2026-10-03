@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kumo Presets Tool</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@400;600;700;900&display=swap');
+
+  :root {
+    --bg:        #0a0c0f;
+    --surface:   #111418;
+    --surface2:  #181c22;
+    --border:    #1e2530;
+    --accent:    #00d4ff;
+    --accent2:   #ff6b35;
+    --accent3:   #7fff00;
+    --text:      #c8d8e8;
+    --muted:     #4a5a6a;
+    --c1:#00d4ff; --c2:#7fff00; --c3:#ff6b35;
+    --c4:#4a5a6a; --c5:#b060ff; --c6:#ffcc00;
+    --c7:#ff4060; --c8:#ff9900;
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0;}
+
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Share Tech Mono',monospace;
+    font-size:12px;
+    min-height:100vh;
+  }
+
+  body::before{
+    content:'';
+    position:fixed;inset:0;
+    background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.08) 2px,rgba(0,0,0,.08) 4px);
+    pointer-events:none;z-index:999;
+  }
+
+  /* ── DROP ZONE ── */
+  #dropZone{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    min-height:100vh;gap:24px;padding:40px;
+  }
+
+  .dz-logo{
+    font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:48px;
+    letter-spacing:8px;color:var(--accent);
+    text-shadow:0 0 40px rgba(0,212,255,.5);
+  }
+
+  .dz-sub{
+    color:var(--muted);letter-spacing:3px;font-size:11px;text-transform:uppercase;
+  }
+
+  .dz-box{
+    border:2px dashed var(--border);
+    padding:48px 72px;
+    text-align:center;
+    cursor:pointer;
+    transition:all .2s;
+    position:relative;
+  }
+  .dz-box:hover,.dz-box.dragover{
+    border-color:var(--accent);
+    background:rgba(0,212,255,.04);
+    box-shadow:0 0 40px rgba(0,212,255,.1);
+  }
+
+  .dz-icon{font-size:40px;margin-bottom:16px;opacity:.4;}
+  .dz-label{font-family:'Barlow Condensed',sans-serif;font-size:18px;letter-spacing:2px;color:var(--text);}
+  .dz-hint{color:var(--muted);font-size:11px;margin-top:8px;}
+
+  #fileInput{display:none;}
+
+  .dz-btn{
+    background:var(--accent);color:var(--bg);
+    font-family:'Barlow Condensed',sans-serif;font-weight:700;
+    font-size:14px;letter-spacing:3px;
+    padding:10px 28px;border:none;cursor:pointer;
+    clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%);
+    transition:all .15s;
+  }
+  .dz-btn:hover{background:#33ddff;}
+
+  .dz-error{color:var(--accent2);font-size:12px;letter-spacing:1px;}
+
+  /* ── MAIN UI ── */
+  #mainUI{display:none;flex-direction:column;min-height:100vh;}
+
+  header{
+    background:var(--surface);
+    border-bottom:2px solid var(--accent);
+    padding:12px 24px;
+    display:flex;align-items:center;gap:20px;
+    position:sticky;top:0;z-index:100;
+  }
+
+  .logo-badge{
+    background:var(--accent);color:var(--bg);
+    font-family:'Barlow Condensed',sans-serif;font-weight:900;
+    font-size:16px;letter-spacing:3px;padding:4px 12px;
+    clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%);
+    cursor:pointer;flex-shrink:0;
+  }
+  .logo-badge:hover{background:#33ddff;}
+  .logo-badge title-tip::after{content:'Load new file';}
+
+  .preset-name{
+    font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:20px;
+    letter-spacing:2px;color:var(--accent);
+    text-shadow:0 0 20px rgba(0,212,255,.4);
+    flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+
+  .header-right{display:flex;align-items:center;gap:20px;}
+
+  .header-meta{display:flex;gap:20px;color:var(--muted);}
+  .meta-stat{display:flex;flex-direction:column;align-items:center;gap:1px;font-size:10px;}
+  .meta-stat .val{color:var(--accent3);font-size:15px;font-family:'Barlow Condensed',sans-serif;font-weight:700;}
+
+  .export-btn{
+    background:transparent;border:1px solid var(--accent3);color:var(--accent3);
+    font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;
+    letter-spacing:2px;padding:7px 18px;cursor:pointer;transition:all .15s;
+    display:flex;align-items:center;gap:8px;white-space:nowrap;
+  }
+  .export-btn:hover{background:rgba(127,255,0,.1);}
+  .export-icon{font-size:14px;}
+
+  /* ── TABS ── */
+  .tabs{
+    display:flex;
+    background:var(--surface);border-bottom:1px solid var(--border);
+    padding:0 24px;flex-shrink:0;
+  }
+  .tab{
+    padding:10px 20px;cursor:pointer;
+    border-bottom:3px solid transparent;
+    font-family:'Barlow Condensed',sans-serif;font-weight:600;
+    font-size:14px;letter-spacing:2px;color:var(--muted);
+    transition:all .15s;user-select:none;
+  }
+  .tab:hover{color:var(--text);}
+  .tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+
+  /* ── PANELS ── */
+  .panel{display:none;padding:20px 24px;flex:1;}
+  .panel.active{display:block;}
+
+  .search-row{display:flex;gap:12px;margin-bottom:14px;align-items:center;}
+  .search-input{
+    background:var(--surface2);border:1px solid var(--border);
+    color:var(--text);font-family:'Share Tech Mono',monospace;font-size:12px;
+    padding:7px 12px;outline:none;flex:1;max-width:300px;transition:border-color .15s;
+  }
+  .search-input:focus{border-color:var(--accent);}
+  .search-input::placeholder{color:var(--muted);}
+  .count-badge{color:var(--muted);font-size:11px;}
+
+  /* ── TABLES ── */
+  .data-table{width:100%;border-collapse:collapse;font-size:12px;}
+  .data-table th{
+    background:var(--surface2);color:var(--muted);
+    font-family:'Barlow Condensed',sans-serif;font-weight:600;
+    font-size:11px;letter-spacing:2px;text-transform:uppercase;
+    padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);
+    position:sticky;top:0;z-index:10;
+  }
+  .data-table td{
+    padding:6px 12px;border-bottom:1px solid rgba(30,37,48,.6);vertical-align:middle;
+  }
+  .data-table tr:hover td{background:rgba(0,212,255,.04);}
+
+  .ch-num{color:var(--muted);font-size:11px;width:50px;}
+
+  .device-tag{
+    display:inline-block;
+    background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.2);
+    color:var(--accent);padding:2px 8px;font-size:11px;letter-spacing:1px;
+  }
+  .device-tag.out{
+    background:rgba(127,255,0,.08);border-color:rgba(127,255,0,.2);color:var(--accent3);
+  }
+  .label-text{color:var(--text);letter-spacing:.5px;}
+
+  .color-dot{
+    display:inline-block;width:8px;height:8px;border-radius:50%;
+    margin-right:6px;vertical-align:middle;
+  }
+  .c1{background:var(--c1);box-shadow:0 0 6px var(--c1);}
+  .c2{background:var(--c2);box-shadow:0 0 6px var(--c2);}
+  .c3{background:var(--c3);box-shadow:0 0 6px var(--c3);}
+  .c4{background:var(--c4);}
+  .c5{background:var(--c5);box-shadow:0 0 6px var(--c5);}
+  .c6{background:var(--c6);box-shadow:0 0 6px var(--c6);}
+  .c7{background:var(--c7);box-shadow:0 0 6px var(--c7);}
+  .c8{background:var(--c8);box-shadow:0 0 6px var(--c8);}
+
+  .mapping-arrow{color:var(--accent2);text-align:center;width:30px;}
+  .src-tag{
+    display:inline-block;
+    background:rgba(255,107,53,.1);border:1px solid rgba(255,107,53,.25);
+    color:var(--accent2);padding:2px 8px;font-size:11px;
+  }
+  .unmapped{color:var(--muted);font-style:italic;}
+
+  /* ── SALVOS ── */
+  .salvos-grid{
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;
+  }
+  .salvo-card{
+    background:var(--surface2);border:1px solid var(--border);
+    padding:14px 16px;cursor:pointer;transition:all .15s;
+    position:relative;overflow:hidden;
+  }
+  .salvo-card.invalid{opacity:.4;}
+  .salvo-card.active-salvo{border-color:var(--accent);background:rgba(0,212,255,.06);}
+  .salvo-card::before{
+    content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+    background:var(--accent3);opacity:0;transition:opacity .15s;
+  }
+  .salvo-card.active-salvo::before{opacity:1;}
+  .salvo-card:hover:not(.invalid){border-color:var(--muted);}
+
+  .salvo-header{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+  .salvo-idx{
+    font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;
+    color:var(--border);line-height:1;width:28px;
+  }
+  .salvo-card.active-salvo .salvo-idx{color:var(--accent);}
+  .salvo-name{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;letter-spacing:1px;}
+  .valid-badge{margin-left:auto;font-size:10px;letter-spacing:2px;padding:2px 8px;border:1px solid;}
+  .valid-badge.yes{border-color:var(--accent3);color:var(--accent3);}
+  .valid-badge.no{border-color:var(--muted);color:var(--muted);}
+
+  .salvo-data-preview{display:flex;flex-wrap:wrap;gap:3px;margin-top:8px;}
+  .sd-cell{
+    width:20px;height:20px;display:flex;align-items:center;justify-content:center;
+    font-size:8px;background:var(--surface);border:1px solid var(--border);color:var(--muted);
+  }
+  .sd-cell.mapped{background:rgba(0,212,255,.1);border-color:rgba(0,212,255,.3);color:var(--accent);}
+  .sd-cell.zero{opacity:.3;}
+
+  .no-results{color:var(--muted);padding:32px;text-align:center;font-size:13px;}
+
+  .salvo-selector-row{
+    display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;
+  }
+  .salvo-pill{
+    padding:4px 12px;border:1px solid var(--border);
+    font-family:'Barlow Condensed',sans-serif;font-size:13px;letter-spacing:1px;
+    cursor:pointer;color:var(--muted);transition:all .15s;
+  }
+  .salvo-pill:hover{border-color:var(--muted);color:var(--text);}
+  .salvo-pill.active{border-color:var(--accent);color:var(--accent);background:rgba(0,212,255,.08);}
+  .salvo-pill.disabled{opacity:.3;pointer-events:none;}
+</style>
+</head>
+<body>
+
+<!-- ── DROP ZONE ─────────────────────────────────────────────────────────── -->
+<div id="dropZone">
+  <div class="dz-logo">KUMO</div>
+  <div class="dz-sub">Presets Viewer &amp; Exporter</div>
+
+  <div class="dz-box" id="dzBox">
+    <div class="dz-icon">📂</div>
+    <div class="dz-label">DROP .PRESETS FILE HERE</div>
+    <div class="dz-hint">or click to browse</div>
+    <input type="file" id="fileInput" accept=".presets">
+  </div>
+
+  <button class="dz-btn" onclick="document.getElementById('fileInput').click()">BROWSE FILE</button>
+  <div class="dz-error" id="dzError"></div>
+</div>
+
+<!-- ── MAIN UI ───────────────────────────────────────────────────────────── -->
+<div id="mainUI">
+  <header>
+    <div class="logo-badge" title="Load a new file" onclick="resetToDropZone()">KUMO</div>
+    <div class="preset-name" id="presetName">—</div>
+    <div class="header-right">
+      <div class="header-meta">
+        <div class="meta-stat"><span class="val" id="statInputs">–</span>INPUTS</div>
+        <div class="meta-stat"><span class="val" id="statOutputs">–</span>OUTPUTS</div>
+        <div class="meta-stat"><span class="val" id="statSalvos">–</span>SALVOS</div>
+      </div>
+      <button class="export-btn" onclick="exportExcel()">
+        <span class="export-icon">⬇</span> EXPORT XLSX
+      </button>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <div class="tab active" data-panel="inputs">INPUTS</div>
+    <div class="tab" data-panel="outputs">OUTPUTS</div>
+    <div class="tab" data-panel="mapping">MAPPING</div>
+    <div class="tab" data-panel="salvos">SALVOS</div>
+  </div>
+
+  <!-- INPUTS -->
+  <div class="panel active" id="panel-inputs">
+    <div class="search-row">
+      <input class="search-input" type="text" placeholder="Filter inputs…" id="inputSearch">
+      <span class="count-badge" id="inputCount"></span>
+    </div>
+    <table class="data-table">
+      <thead><tr><th>CH</th><th>DEVICE</th><th>LABEL</th></tr></thead>
+      <tbody id="inputsBody"></tbody>
+    </table>
+    <div class="no-results" id="inputsNone" style="display:none">No results</div>
+  </div>
+
+  <!-- OUTPUTS -->
+  <div class="panel" id="panel-outputs">
+    <div class="search-row">
+      <input class="search-input" type="text" placeholder="Filter outputs…" id="outputSearch">
+      <span class="count-badge" id="outputCount"></span>
+    </div>
+    <table class="data-table">
+      <thead><tr><th>CH</th><th>DEVICE</th><th>LABEL</th><th>COLOR</th></tr></thead>
+      <tbody id="outputsBody"></tbody>
+    </table>
+    <div class="no-results" id="outputsNone" style="display:none">No results</div>
+  </div>
+
+  <!-- MAPPING -->
+  <div class="panel" id="panel-mapping">
+    <div class="salvo-selector-row" id="salvoSelector"></div>
+    <div class="search-row">
+      <input class="search-input" type="text" placeholder="Filter mapping…" id="mappingSearch">
+      <span class="count-badge" id="mappingCount"></span>
+    </div>
+    <table class="data-table">
+      <thead><tr>
+        <th>OUT CH</th><th>OUTPUT DEVICE</th><th>OUTPUT LABEL</th>
+        <th style="text-align:center">←</th>
+        <th>SRC CH</th><th>SOURCE DEVICE</th><th>SOURCE LABEL</th>
+      </tr></thead>
+      <tbody id="mappingBody"></tbody>
+    </table>
+    <div class="no-results" id="mappingNone" style="display:none">No results</div>
+  </div>
+
+  <!-- SALVOS -->
+  <div class="panel" id="panel-salvos">
+    <div class="salvos-grid" id="salvosGrid"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════════
+// PARSER
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function parseKumoPresets(buffer) {
+  const data = new Uint8Array(buffer);
+
+  // Read null-terminated ASCII string from offset
+  function readString(offset) {
+    let end = offset;
+    while (end < data.length && data[end] !== 0) end++;
+    try {
+      const str = String.fromCharCode(...data.slice(offset, end));
+      return isPrintable(str) ? str : null;
+    } catch { return null; }
+  }
+
+  function isPrintable(s) {
+    return [...s].every(c => { const cc = c.charCodeAt(0); return cc >= 32 && cc <= 126; });
+  }
+
+  // Find preset name: first long printable null-terminated string
+  let presetName = 'Unknown Preset';
+  for (let i = 0x20; i < Math.min(0x60, data.length); i++) {
+    const s = readString(i);
+    if (s && s.length >= 4) { presetName = s; break; }
+  }
+
+  // Scan for channel records: [sectionType][channel][subtype][0x00][string\0]
+  // sectionType 0x0e = inputs, 0x10 = outputs
+  const inputs = {}, outputs = {};
+
+  for (let i = 0; i < data.length - 5; i++) {
+    const typ = data[i], ch = data[i+1], sub = data[i+2], z = data[i+3];
+    if (z !== 0x00) continue;
+    if (typ !== 0x0e && typ !== 0x10) continue;
+    if (sub !== 0x02 && sub !== 0x03 && sub !== 0x05) continue;
+
+    const s = readString(i + 4);
+    if (!s || s.length === 0 || s.length > 50) continue;
+
+    const store = typ === 0x0e ? inputs : outputs;
+    if (!store[ch]) store[ch] = { device: '', label: '', color: '' };
+
+    if (sub === 0x02) store[ch].device = s;
+    else if (sub === 0x03) store[ch].label = s;
+    else if (sub === 0x05) {
+      // {"classes":"color_N"} stored with escaped quotes
+      const m = s.match(/color_(\d+)/);
+      if (m) store[ch].color = 'color_' + m[1];
+    }
+  }
+
+  // Handle first input (type 0x09 pattern near start of file)
+  for (let i = 0x30; i < 0x60; i++) {
+    if (data[i] === 0x09 && data[i+1] === 0x02 && data[i+2] === 0x00) {
+      const s = readString(i + 3);
+      if (s && s.length > 0 && s.length < 20) {
+        const firstCh = 9; // first input channel
+        if (!inputs[firstCh]) inputs[firstCh] = { device: '', label: '', color: '' };
+        if (!inputs[firstCh].device) inputs[firstCh].device = s;
+      }
+    }
+    if (data[i] === 0x09 && data[i+1] === 0x03 && data[i+2] === 0x00) {
+      const s = readString(i + 3);
+      if (s && s.length > 0 && s.length < 20) {
+        if (!inputs[9]) inputs[9] = { device: '', label: '', color: '' };
+        if (!inputs[9].label) inputs[9].label = s;
+      }
+    }
+  }
+
+  // Extract salvos: find JSON objects with salvodata
+  const salvos = [];
+  const textDecoder = new TextDecoder('ascii', { fatal: false });
+  const rawText = textDecoder.decode(buffer);
+  const jsonRegex = /\{"index":"(\d+)","name":"([^"]+)","valid":"(true|false)","salvodata":\[([0-9,]+)\]\}/g;
+  let m;
+  while ((m = jsonRegex.exec(rawText)) !== null) {
+    salvos.push({
+      index: m[1],
+      name: m[2],
+      valid: m[3],
+      salvodata: m[4].split(',').map(Number)
+    });
+  }
+
+  return { presetName, inputs, outputs, salvos };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+let DATA = null;
+let activeSalvoIdx = 0;
+let sourceFileName = '';
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// FILE LOADING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function loadFile(file) {
+  if (!file) return;
+  sourceFileName = file.name.replace(/\.[^.]+$/, '');
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      DATA = parseKumoPresets(e.target.result);
+      if (!DATA || Object.keys(DATA.inputs).length === 0) throw new Error('No channel data found');
+      activeSalvoIdx = 0;
+      showMainUI();
+    } catch (err) {
+      document.getElementById('dzError').textContent = 'Parse error: ' + err.message;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// Drop zone wiring
+const dzBox = document.getElementById('dzBox');
+const fileInput = document.getElementById('fileInput');
+
+dzBox.addEventListener('click', () => fileInput.click());
+dzBox.addEventListener('dragover', e => { e.preventDefault(); dzBox.classList.add('dragover'); });
+dzBox.addEventListener('dragleave', () => dzBox.classList.remove('dragover'));
+dzBox.addEventListener('drop', e => {
+  e.preventDefault(); dzBox.classList.remove('dragover');
+  loadFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => loadFile(e.target.files[0]));
+
+function resetToDropZone() {
+  document.getElementById('mainUI').style.display = 'none';
+  document.getElementById('dropZone').style.display = 'flex';
+  DATA = null;
+  fileInput.value = '';
+  document.getElementById('dzError').textContent = '';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SHOW MAIN UI
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function showMainUI() {
+  document.getElementById('dropZone').style.display = 'none';
+  document.getElementById('mainUI').style.display = 'flex';
+
+  const { presetName, inputs, outputs, salvos } = DATA;
+  document.getElementById('presetName').textContent = presetName.toUpperCase();
+  document.getElementById('statInputs').textContent  = Object.keys(inputs).length;
+  document.getElementById('statOutputs').textContent = Object.keys(outputs).length;
+  document.getElementById('statSalvos').textContent  = salvos.filter(s => s.valid === 'true').length;
+
+  renderInputs();
+  renderOutputs();
+  buildSalvoSelector();
+  renderMapping();
+  renderSalvos();
+
+  // Reset to first tab
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelector('.tab[data-panel="inputs"]').classList.add('active');
+  document.getElementById('panel-inputs').classList.add('active');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RENDER HELPERS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function colorDot(colorClass) {
+  if (!colorClass) return '';
+  const n = colorClass.replace('color_', '');
+  return `<span class="color-dot c${n}"></span>`;
+}
+
+function sortedEntries(obj) {
+  return Object.entries(obj).map(([k,v]) => ({ch: parseInt(k), ...v})).sort((a,b) => a.ch - b.ch);
+}
+
+function getInputInfo(ch) { return DATA.inputs[ch] || DATA.inputs[String(ch)] || null; }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INPUTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function renderInputs(filter = '') {
+  const entries = sortedEntries(DATA.inputs);
+  const filt = filter ? entries.filter(e =>
+    `${e.ch} ${e.device} ${e.label}`.toLowerCase().includes(filter.toLowerCase())
+  ) : entries;
+
+  document.getElementById('inputsBody').innerHTML = filt.map(e => `
+    <tr>
+      <td class="ch-num">${String(e.ch).padStart(2,'0')}</td>
+      <td><span class="device-tag">${e.device || '—'}</span></td>
+      <td class="label-text">${e.label || '<span class="unmapped">—</span>'}</td>
+    </tr>`).join('');
+
+  document.getElementById('inputCount').textContent = `${filt.length} of ${entries.length}`;
+  document.getElementById('inputsNone').style.display = filt.length ? 'none' : 'block';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// OUTPUTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function renderOutputs(filter = '') {
+  const entries = sortedEntries(DATA.outputs);
+  const filt = filter ? entries.filter(e =>
+    `${e.ch} ${e.device} ${e.label} ${e.color}`.toLowerCase().includes(filter.toLowerCase())
+  ) : entries;
+
+  document.getElementById('outputsBody').innerHTML = filt.map(e => `
+    <tr>
+      <td class="ch-num">${String(e.ch).padStart(2,'0')}</td>
+      <td><span class="device-tag out">${e.device || '—'}</span></td>
+      <td class="label-text">${e.label || '<span class="unmapped">—</span>'}</td>
+      <td>${colorDot(e.color)}<span style="color:var(--muted);font-size:10px">${e.color || ''}</span></td>
+    </tr>`).join('');
+
+  document.getElementById('outputCount').textContent = `${filt.length} of ${entries.length}`;
+  document.getElementById('outputsNone').style.display = filt.length ? 'none' : 'block';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SALVO SELECTOR (above mapping table)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function buildSalvoSelector() {
+  const el = document.getElementById('salvoSelector');
+  el.innerHTML = '<span style="color:var(--muted);font-size:11px;letter-spacing:2px">SALVO:</span>' +
+    DATA.salvos.map((sv, idx) => `
+      <div class="salvo-pill ${sv.valid !== 'true' ? 'disabled' : ''} ${idx === activeSalvoIdx ? 'active' : ''}"
+           data-idx="${idx}" onclick="selectSalvoFromPill(${idx})">${sv.name}</div>
+    `).join('');
+}
+
+function selectSalvoFromPill(idx) {
+  if (DATA.salvos[idx].valid !== 'true') return;
+  activeSalvoIdx = idx;
+  buildSalvoSelector();
+  renderMapping(document.getElementById('mappingSearch').value);
+  renderSalvos();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAPPING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function getMappingRows() {
+  const salvo = DATA.salvos[activeSalvoIdx];
+  return salvo.salvodata.map((srcCh, i) => {
+    const outCh = i + 1;
+    const outInfo = DATA.outputs[outCh] || DATA.outputs[String(outCh)];
+    const inInfo  = DATA.inputs[srcCh]  || DATA.inputs[String(srcCh)];
+    return { outCh, srcCh, outInfo, inInfo };
+  });
+}
+
+function renderMapping(filter = '') {
+  const salvo = DATA.salvos[activeSalvoIdx];
+  const rows = getMappingRows();
+
+  const filt = filter ? rows.filter(r => {
+    const txt = [r.outCh, r.srcCh,
+      r.outInfo?.device, r.outInfo?.label,
+      r.inInfo?.device,  r.inInfo?.label
+    ].filter(Boolean).join(' ').toLowerCase();
+    return txt.includes(filter.toLowerCase());
+  }) : rows;
+
+  document.getElementById('mappingBody').innerHTML = filt.map(r => {
+    const outDev = r.outInfo ? `<span class="device-tag out">${r.outInfo.device}</span>` : `<span class="unmapped">?</span>`;
+    const outLbl = r.outInfo?.label || '<span class="unmapped">—</span>';
+    const srcNum = r.srcCh === 0 ? '<span class="unmapped">—</span>' : `<span class="src-tag">${String(r.srcCh).padStart(2,'0')}</span>`;
+    const inDev  = r.inInfo ? `<span class="device-tag">${r.inInfo.device}</span>` : (r.srcCh ? `<span class="unmapped">CH ${r.srcCh}</span>` : '');
+    const inLbl  = r.inInfo?.label || '';
+    return `<tr>
+      <td class="ch-num">${String(r.outCh).padStart(2,'0')}</td>
+      <td>${outDev}</td><td class="label-text">${outLbl}</td>
+      <td class="mapping-arrow">←</td>
+      <td>${srcNum}</td><td>${inDev}</td>
+      <td class="label-text">${inLbl}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('mappingCount').textContent = `${filt.length} of ${rows.length} routes`;
+  document.getElementById('mappingNone').style.display = filt.length ? 'none' : 'block';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SALVOS PANEL
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function renderSalvos() {
+  document.getElementById('salvosGrid').innerHTML = DATA.salvos.map((sv, idx) => {
+    const valid = sv.valid === 'true';
+    const cells = sv.salvodata.slice(0, 64).map((v, i) =>
+      `<div class="sd-cell ${v === 0 ? 'zero' : 'mapped'}" title="Out ${i+1} → Src ${v}">${v || ''}</div>`
+    ).join('');
+    return `<div class="salvo-card ${valid ? '' : 'invalid'} ${idx === activeSalvoIdx ? 'active-salvo' : ''}"
+                 onclick="selectSalvoFromCard(${idx})">
+      <div class="salvo-header">
+        <div class="salvo-idx">${sv.index}</div>
+        <div class="salvo-name">${sv.name}</div>
+        <div class="valid-badge ${valid ? 'yes' : 'no'}">${valid ? 'VALID' : 'EMPTY'}</div>
+      </div>
+      <div class="salvo-data-preview">${cells}</div>
+    </div>`;
+  }).join('');
+}
+
+function selectSalvoFromCard(idx) {
+  if (DATA.salvos[idx].valid !== 'true') return;
+  activeSalvoIdx = idx;
+  buildSalvoSelector();
+  renderMapping(document.getElementById('mappingSearch').value);
+  renderSalvos();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('panel-' + tab.dataset.panel).classList.add('active');
+  });
+});
+
+// Search wiring
+document.getElementById('inputSearch').addEventListener('input', e => renderInputs(e.target.value));
+document.getElementById('outputSearch').addEventListener('input', e => renderOutputs(e.target.value));
+document.getElementById('mappingSearch').addEventListener('input', e => renderMapping(e.target.value));
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EXCEL EXPORT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function exportExcel() {
+  if (!DATA) return;
+  const wb = XLSX.utils.book_new();
+
+  const headerStyle = { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '1A2A3A' } } };
+
+  // ── Sheet 1: Inputs ──────────────────────────────────────────────────────
+  const inputRows = [['Channel', 'Device', 'Label']];
+  sortedEntries(DATA.inputs).forEach(e => {
+    inputRows.push([e.ch, e.device || '', e.label || '']);
+  });
+  const wsInputs = XLSX.utils.aoa_to_sheet(inputRows);
+  styleSheet(wsInputs, inputRows.length, ['Channel','Device','Label'], '0D2030');
+  wsInputs['!cols'] = [{wch:10},{wch:18},{wch:20}];
+  XLSX.utils.book_append_sheet(wb, wsInputs, 'Inputs');
+
+  // ── Sheet 2: Outputs ─────────────────────────────────────────────────────
+  const outputRows = [['Channel', 'Device', 'Label', 'Color Class']];
+  sortedEntries(DATA.outputs).forEach(e => {
+    outputRows.push([e.ch, e.device || '', e.label || '', e.color || '']);
+  });
+  const wsOutputs = XLSX.utils.aoa_to_sheet(outputRows);
+  styleSheet(wsOutputs, outputRows.length, ['Channel','Device','Label','Color Class'], '1A1020');
+  wsOutputs['!cols'] = [{wch:10},{wch:18},{wch:20},{wch:14}];
+  addColorColumn(wsOutputs, outputRows);
+  XLSX.utils.book_append_sheet(wb, wsOutputs, 'Outputs');
+
+  // ── Sheet 3: Mapping (one sheet per valid salvo) ──────────────────────────
+  DATA.salvos.forEach(sv => {
+    if (sv.valid !== 'true') return;
+    const rows = [['Out CH','Output Device','Output Label','←','Src CH','Source Device','Source Label']];
+    sv.salvodata.forEach((srcCh, i) => {
+      const outCh = i + 1;
+      const outInfo = DATA.outputs[outCh] || DATA.outputs[String(outCh)];
+      const inInfo  = DATA.inputs[srcCh]  || DATA.inputs[String(srcCh)];
+      rows.push([
+        outCh,
+        outInfo?.device || '',
+        outInfo?.label  || '',
+        '←',
+        srcCh || '',
+        inInfo?.device  || (srcCh ? `CH ${srcCh}` : ''),
+        inInfo?.label   || ''
+      ]);
+    });
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    styleSheet(ws, rows.length, rows[0], '0D1A12');
+    ws['!cols'] = [{wch:8},{wch:18},{wch:18},{wch:4},{wch:8},{wch:18},{wch:18}];
+    // Safe sheet name (max 31 chars, strip bad chars)
+    const sheetName = ('Map-' + sv.name).replace(/[\\/?*\[\]:]/g,'').slice(0,31);
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  });
+
+  // ── Sheet 4: Salvos ──────────────────────────────────────────────────────
+  const salvoHeaderRow = ['Index','Name','Valid'];
+  const maxLen = Math.max(...DATA.salvos.map(s => s.salvodata.length));
+  for (let i = 1; i <= maxLen; i++) salvoHeaderRow.push(`Out ${i}`);
+
+  const salvoRows = [salvoHeaderRow];
+  DATA.salvos.forEach(sv => {
+    salvoRows.push([sv.index, sv.name, sv.valid, ...sv.salvodata]);
+  });
+  const wsSalvos = XLSX.utils.aoa_to_sheet(salvoRows);
+  styleSheet(wsSalvos, salvoRows.length, salvoHeaderRow.slice(0,4), '1A1020');
+  wsSalvos['!cols'] = [{wch:7},{wch:18},{wch:7},...Array(maxLen).fill({wch:6})];
+  XLSX.utils.book_append_sheet(wb, wsSalvos, 'Salvos');
+
+  // ── Download ──────────────────────────────────────────────────────────────
+  const filename = (sourceFileName || DATA.presetName || 'kumo_presets').replace(/[^a-z0-9_\-]/gi,'_') + '.xlsx';
+  XLSX.writeFile(wb, filename);
+}
+
+// Apply header row styling + alternating rows
+function styleSheet(ws, rowCount, headers, bgHex) {
+  const darkFill   = { patternType:'solid', fgColor:{ rgb: bgHex.replace('#','') } };
+  const headerFill = { patternType:'solid', fgColor:{ rgb: '1A3050' } };
+  const altFill    = { patternType:'solid', fgColor:{ rgb: '111418' } };
+  const boldWhite  = { bold:true, color:{ rgb:'C8D8E8' } };
+  const normalFont = { color:{ rgb:'C8D8E8' } };
+  const mutedFont  = { color:{ rgb:'4A5A6A' } };
+
+  // Style header row
+  headers.forEach((_, colIdx) => {
+    const cellRef = XLSX.utils.encode_cell({ r:0, c:colIdx });
+    if (!ws[cellRef]) ws[cellRef] = { v: headers[colIdx], t:'s' };
+    ws[cellRef].s = { font: boldWhite, fill: headerFill, alignment:{ horizontal:'center' } };
+  });
+
+  // Style data rows
+  for (let r = 1; r < rowCount; r++) {
+    const isAlt = r % 2 === 0;
+    const fill = isAlt ? altFill : darkFill;
+    const ncols = headers.length;
+    for (let c = 0; c < ncols; c++) {
+      const ref = XLSX.utils.encode_cell({ r, c });
+      if (!ws[ref]) ws[ref] = { v:'', t:'s' };
+      ws[ref].s = { font: c === 0 ? mutedFont : normalFont, fill };
+    }
+  }
+}
+
+// Color-code the Color Class column in Outputs sheet
+function addColorColumn(ws, rows) {
+  const colorMap = {
+    color_1:'00D4FF', color_2:'7FFF00', color_3:'FF6B35',
+    color_4:'4A5A6A', color_5:'B060FF', color_6:'FFCC00',
+    color_7:'FF4060', color_8:'FF9900'
+  };
+  rows.slice(1).forEach((row, i) => {
+    const colorClass = row[3];
+    if (!colorClass) return;
+    const hex = colorMap[colorClass];
+    if (!hex) return;
+    const ref = XLSX.utils.encode_cell({ r: i+1, c: 3 });
+    if (ws[ref]) {
+      ws[ref].s = {
+        ...ws[ref].s,
+        font: { color: { rgb: hex } }
+      };
+    }
+  });
+}
+</script>
+</body>
+</html>
